@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from typing import Dict, List, Optional, Union
+from typing import Dict, Iterator, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -17,6 +17,7 @@ from feast.on_demand_feature_view import OnDemandFeatureView
 from feast.registry import Registry
 from feast.repo_config import FeastConfigBaseModel, RepoConfig
 from feast_trino.trino_source import TrinoSource
+from feast_trino.trino_type_map import pa_to_trino_value_type
 from feast_trino.trino_utils import Trino
 
 
@@ -244,7 +245,11 @@ def _upload_entity_df_and_get_entity_schema(
 
         return entity_schema
     elif isinstance(entity_df, pd.DataFrame):
-        raise InvalidEntityType(type(entity_df))
+        _upload_pandas_dataframe_to_trino(
+            client=client, df=entity_df, table_ref=table_name
+        )
+        entity_schema = dict(zip(entity_df.columns, entity_df.dtypes))
+        return entity_schema
     else:
         raise InvalidEntityType(type(entity_df))
 
@@ -260,6 +265,42 @@ def _get_trino_client(config: RepoConfig) -> Trino:
         port=config.offline_store.port,
     )
     return client
+
+
+def _upload_pandas_dataframe_to_trino(
+    client: Trino, df: pd.DataFrame, table_ref: str
+) -> None:
+    pyarrow_schema = pyarrow.Table.from_pandas(df).schema
+    trino_schema = []
+    for field in pyarrow_schema:
+        try:
+            trino_type = pa_to_trino_value_type(str(field.type))
+        except KeyError:
+            raise ValueError(
+                f"Not supported type '{field.type}' in entity_df for '{field.name}'."
+            )
+        trino_schema.append((field.name, trino_type))
+
+    create_schema_query = f"""CREATE TABLE {table_ref} (
+        {','.join([f'{col_name} {col_type}' for col_name, col_type in trino_schema])}
+    )
+    WITH (format = 'parquet')
+    """
+    client.execute_query(create_schema_query)
+
+    # Upload batchs of 1M rows at a time
+    for batch_df in _pandas_dataframe_fix_batches(df=df, batch_size=1000000):
+        insert_rows_query = f"""
+        INSERT INTO {table_ref}
+        VALUES {','.join([str(values) for values in batch_df.to_records()])};
+        """
+    client.execute_query(insert_rows_query)
+
+
+def _pandas_dataframe_fix_batches(
+    df: pd.DataFrame, batch_size: int
+) -> Iterator[pd.DataFrame]:
+    yield (df[pos : pos + batch_size] for pos in range(0, len(df), batch_size))
 
 
 MULTIPLE_FEATURE_VIEW_POINT_IN_TIME_JOIN = """
