@@ -22,3 +22,9 @@ build:
 
 install-ci-dependencies:
 	pip install -e ".[ci]"
+
+start-trino-locally:
+	docker run --detach --rm -p 8080:8080 --name trino -v ${ROOT_DIR}/config/catalog/:/etc/catalog/:ro trinodb/trino:364
+
+stop-trino-locally:
+	docker stop trino
