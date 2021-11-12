@@ -27,8 +27,15 @@ install-ci-dependencies:
 	pip install -e ".[ci]"
 
 start-local-cluster:
-	docker run --detach --rm -p 8080:8080 --name trino -v ${ROOT_DIR}/config/catalog/:/etc/catalog/:ro trinodb/trino:364
+	docker run --detach --rm -p 8080:8080 -p 9083:9083 --name trino -v ${ROOT_DIR}/config/catalog/:/etc/catalog/:ro trinodb/trino:364
 	sleep 15
 
 kill-local-cluster:
 	docker stop trino
+
+start-hive-locally:
+	docker build -t local_hive -f ${ROOT_DIR}/config/containers/hive.Dockerfile .
+	docker run --rm -p 9083:9083 --name hive local_hive
+
+kill-hive-locally:
+	docker stop hive

@@ -1,3 +1,5 @@
+from typing import Dict
+
 import pandas as pd
 
 from feast_trino.connectors.utils import (
@@ -11,7 +13,7 @@ from feast_trino.trino_utils import Trino
 
 
 def upload_pandas_dataframe_to_trino(
-    client: Trino, df: pd.DataFrame, table_ref: str
+    client: Trino, df: pd.DataFrame, table_ref: str, config: Dict,
 ) -> None:
     client.execute_query(
         CREATE_SCHEMA_QUERY_TEMPLATE.format(

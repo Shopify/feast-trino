@@ -1,11 +1,12 @@
 import uuid
 from datetime import date, datetime
-from typing import Dict, List, Optional, Union
+from importlib import import_module
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
 import pyarrow
-from pydantic import StrictStr
+from pydantic import StrictInt, StrictStr
 from pydantic.typing import Literal
 
 from feast.data_source import DataSource
@@ -19,6 +20,10 @@ from feast.repo_config import FeastConfigBaseModel, RepoConfig
 from feast_trino.trino_source import TrinoSource
 from feast_trino.trino_utils import Trino
 
+CONNECTOR_MAPPING = {
+    "memory": "feast_trino.connectors.memory.py",
+}
+
 
 class TrinoOfflineStoreConfig(FeastConfigBaseModel):
     """ Online store config for Trino """
@@ -29,7 +34,7 @@ class TrinoOfflineStoreConfig(FeastConfigBaseModel):
     host: StrictStr
     """ Host of the Trino cluster """
 
-    port: int
+    port: StrictInt
     """ Port of the Trino cluster """
 
     catalog: StrictStr
@@ -37,6 +42,13 @@ class TrinoOfflineStoreConfig(FeastConfigBaseModel):
 
     dataset: StrictStr = "feast"
     """ (optional) Trino Dataset name for temporary tables """
+
+    connector: Dict
+    """
+    Path of the connector used and extract parameters if necessary
+    Must contain at least the "name" keyword.
+    For example {"name": "memory", "extra_arg": "value"}
+    """
 
 
 class TrinoRetrievalJob(RetrievalJob):
@@ -176,7 +188,10 @@ class TrinoOfflineStore(OfflineStore):
         )
 
         entity_schema = _upload_entity_df_and_get_entity_schema(
-            client=client, table_name=table_reference, entity_df=entity_df,
+            client=client,
+            table_name=table_reference,
+            entity_df=entity_df,
+            connector_config=config.offline_store.connector,
         )
 
         entity_df_event_timestamp_col = offline_utils.infer_event_timestamp_from_entity_df(
@@ -224,7 +239,10 @@ def _get_table_reference_for_new_entity(catalog: str, dataset_name: str) -> str:
 
 
 def _upload_entity_df_and_get_entity_schema(
-    client: Trino, table_name: str, entity_df: Union[pd.DataFrame, str],
+    client: Trino,
+    table_name: str,
+    entity_df: Union[pd.DataFrame, str],
+    connector_config: Dict[str, Any],
 ) -> Dict[str, np.dtype]:
     """Uploads a Pandas entity dataframe into a Trino table and returns the resulting table"""
     if type(entity_df) is str:
@@ -244,11 +262,15 @@ def _upload_entity_df_and_get_entity_schema(
 
         return entity_schema
     elif isinstance(entity_df, pd.DataFrame):
-        # Placeholder till it's part of the configuration of Trino
-        from feast_trino.connectors.memory import upload_pandas_dataframe_to_trino
+        connector_name = connector_config.pop("name")
+        if connector_name not in CONNECTOR_MAPPING.keys():
+            raise ValueError(f"The connector '{connector_name}' is not supported")
 
-        upload_pandas_dataframe_to_trino(
-            client=client, df=entity_df, table_ref=table_name
+        module = import_module(CONNECTOR_MAPPING[connector_name])
+        func = getattr(module, "upload_pandas_dataframe_to_trino")
+
+        func(
+            client=client, df=entity_df, table_ref=table_name, config=connector_config,
         )
         entity_schema = dict(zip(entity_df.columns, entity_df.dtypes))
         return entity_schema
