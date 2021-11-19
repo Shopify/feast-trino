@@ -52,7 +52,11 @@ class TrinoSourceCreator(DataSourceCreator):
 
     def create_offline_store_config(self) -> FeastConfigBaseModel:
         return TrinoOfflineStoreConfig(
-            host="localhost", port=8080, catalog="memory", dataset=self.project_name
+            host="localhost",
+            port=8080,
+            catalog="memory",
+            dataset=self.project_name,
+            connector={"path": "feast_trino.connectors.memory"},
         )
 
     def teardown(self):
