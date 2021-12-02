@@ -1,7 +1,5 @@
 """
-Memory connector based on the following doc https://trino.io/docs/current/connector/memory.html
-
-Mostly used for testing and CI/CD
+Hive connector based on the following doc https://trino.io/docs/current/connector/hive.html
 
 Example yaml config to use this connector
 ```yaml
@@ -12,7 +10,8 @@ offline_store:
     catalog: memory
     dataset: ci
     connector:
-        path: feast_trino.connectors.memory
+        path: feast_trino.connectors.hive
+        file_format: parquet # https://trino.io/docs/current/connector/hive.html#supported-file-types
 ```
 """
 
@@ -36,11 +35,15 @@ def upload_pandas_dataframe_to_trino(
     table_ref: str,
     connector_args: Optional[Dict[str, Any]] = None,
 ) -> None:
+    connector_args = connector_args or {}
+    file_format = connector_args.pop("file_format", "parquet")
+    with_statement = f"WITH (format = '{file_format}')"
+
     client.execute_query(
         CREATE_SCHEMA_QUERY_TEMPLATE.format(
             table_ref=table_ref,
             schema=trino_table_schema_from_dataframe(df=df),
-            with_statement="",
+            with_statement=with_statement,
         )
     )
 

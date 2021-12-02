@@ -266,10 +266,13 @@ def _upload_entity_df_and_get_entity_schema(
 
         return entity_schema
     elif isinstance(entity_df, pd.DataFrame):
-        module = importlib.import_module(connector["path"])
+        connector_path = connector.pop("path")
+        module = importlib.import_module(connector_path)
         upload_dataframe = getattr(module, "upload_pandas_dataframe_to_trino")
 
-        upload_dataframe(client=client, df=entity_df, table_ref=table_name)
+        upload_dataframe(
+            client=client, df=entity_df, table_ref=table_name, connector_args=connector
+        )
         entity_schema = dict(zip(entity_df.columns, entity_df.dtypes))
         return entity_schema
     else:
