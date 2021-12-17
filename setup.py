@@ -20,7 +20,7 @@ CI_REQUIRE = [
 ]
 
 setup(
-    name="feast-trino",
+    name=NAME,
     version=VERSION,
     author="Shopify",
     author_email="developers@shopify.com",

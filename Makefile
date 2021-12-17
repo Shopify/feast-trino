@@ -35,6 +35,16 @@ build:
 	rm -rf dist/*
 	python setup.py sdist bdist_wheel
 
+publish-test:
+	if [ -z ${PYPI_PASSWORD_SHOPIFY} ]; then echo "Run this command by exporting PYPI_PASSWORD_SHOPIFY first" && exit 1;fi
+	make build
+	twine upload -r testpypi -u shopify -p ${PYPI_PASSWORD_SHOPIFY} dist/*
+
+publish:
+	if [ -z ${PYPI_PASSWORD_SHOPIFY} ]; then echo "Run this command by exporting PYPI_PASSWORD_SHOPIFY first" && exit 1;fi
+	make build
+	twine upload -u shopify -p ${PYPI_PASSWORD_SHOPIFY} dist/*
+
 install-feast-submodule:
 	cd ${ROOT_DIR}; git submodule add --force https://github.com/feast-dev/feast.git feast
 	cd ${ROOT_DIR}/feast; git fetch --all --tags

@@ -7,10 +7,9 @@ The feast-trino plugin is tested on the following versions of python [3.7, 3.8, 
 
 Here is also how the current feast-trino plugin has been tested against different versions of Feast and Trino
 
-| Feast-trino | Feast  | Trino |
-|-------------|--------|-------|
-| 1.0.0       | 0.15.* | 364   |
-| 1.0.0       | 0.16.* | 364   |
+| Feast-trino | Feast          | Trino |
+|-------------|----------------|-------|
+| 1.0.0       | 0.15.*, 0.16.* | 364   |
 
 ## Quickstart
 
