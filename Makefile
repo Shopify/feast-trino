@@ -2,7 +2,7 @@
 .PHONY: build
 
 ROOT_DIR               := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
-FEAST_VERSION          ?= v0.16.1
+FEAST_VERSION          ?= 0.17.0
 TRINO_VERSION          ?= 364
 PYPI_PASSWORD_SHOPIFY  ?= WRONG_PASSWORD
 VERSION                := $(shell cat VERSION)
@@ -73,14 +73,22 @@ endif
 	cd ${ROOT_DIR}; git checkout main
 
 install-feast-submodule:
+ifeq ($(shell uname -m), arm64)
+	@echo "See https://github.com/feast-dev/feast/issues/2105 for M1 compatibility"
+	@echo "You need to export environment variables first"
+	cd ${ROOT_DIR}; pip install --upgrade pip
+	cd ${ROOT_DIR}; pip install cryptography -U
+endif
+
 	cd ${ROOT_DIR}; git submodule add --force https://github.com/feast-dev/feast.git feast
 	cd ${ROOT_DIR}/feast; git fetch --all --tags
-	cd ${ROOT_DIR}/feast; git reset --hard tags/${FEAST_VERSION}
-	cd ${ROOT_DIR}/feast; pip install -e "sdk/python[ci]"
+	cd ${ROOT_DIR}/feast; git reset --hard tags/v${FEAST_VERSION}
+	cd ${ROOT_DIR}/feast; pip install "feast[ci]==${FEAST_VERSION}"
+	cd ${ROOT_DIR}/feast; pip install --no-deps -e "sdk/python[ci]"
 	-cd ${ROOT_DIR}; git rm --cached -f feast/ .gitmodules
 
 install-ci-dependencies:
-	pip install -e ".[ci]"
+	cd ${ROOT_DIR}; pip install -e ".[ci]"
 
 start-local-cluster:
 	docker run --detach --rm -p 8080:8080 --name trino -v ${ROOT_DIR}/config/catalog/:/etc/catalog/:ro trinodb/trino:${TRINO_VERSION}

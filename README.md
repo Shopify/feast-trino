@@ -176,9 +176,9 @@ make kill-local-cluster
 
 #### Using different versions of Feast or Trino
 The [makefile](./Makefile) contains the following default values:
-- FEAST_VERSION: v0.15.1
+- FEAST_VERSION: 0.17.0
 - TRINO_VERSION: 364
 
-Thus, `make install-feast-submodule` will automatically compile Feast `v0.15.1`. If you want to try another version like `v0.14.1`, you just need to run `make install-feast-submodule FEAST_VERSION=v0.14.1`
+Thus, `make install-feast-submodule` will automatically compile Feast `0.17.0`. If you want to try another version like `0.18.0`, you just need to run `make install-feast-submodule FEAST_VERSION=0.18.0`
 
 Same applies for TRINO_VERSION when you start the local cluster `make start-local-cluster TRINO_VERSION=XXX`
