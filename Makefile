@@ -10,6 +10,7 @@ VERSION_TAG            := v${VERSION}
 MOST_RECENT_TAG        := $(shell git describe --tags --abbrev=0)
 DEFAULT_BRANCH         := main
 GIT_BRANCH_NAME        := $(shell git rev-parse --abbrev-ref HEAD)
+IS_PACKAGE_INSTALLED   := $(shell pip list | grep -E 'feast-trino\s' | wc -l)
 
 format:
 	# Sort
@@ -28,11 +29,15 @@ test:
 	cd ${ROOT_DIR}; python -m pytest tests/
 
 test-python-universal:
+ifneq ($(strip ${IS_PACKAGE_INSTALLED}), 1)
+	cd ${ROOT_DIR}; make build
+endif
 	-mv ${ROOT_DIR}/tests ${ROOT_DIR}/tests_old
-	-cd ${ROOT_DIR}; FULL_REPO_CONFIGS_MODULE=feast_trino.feast_tests FEAST_USAGE=False IS_TEST=True python -m pytest --integration --universal ${ROOT_DIR}/feast/sdk/python/tests/
+	-cd ${ROOT_DIR}; FULL_REPO_CONFIGS_MODULE=feast_trino.feast_tests FEAST_USAGE=False IS_TEST=True python -m pytest --integration --universal ${ROOT_DIR}/feast/sdk/python/tests/integration/registration/test_universal_types.py
 	-mv ${ROOT_DIR}/tests_old ${ROOT_DIR}/tests
 
 test-python-universal-ci:
+	cd ${ROOT_DIR}; make build
 	mv ${ROOT_DIR}/tests ${ROOT_DIR}/tests_old
 	cd ${ROOT_DIR}; FULL_REPO_CONFIGS_MODULE=feast_trino.feast_tests FEAST_USAGE=False IS_TEST=True python -m pytest --integration --universal ${ROOT_DIR}/feast/sdk/python/tests
 	mv ${ROOT_DIR}/tests_old ${ROOT_DIR}/tests
@@ -40,6 +45,7 @@ test-python-universal-ci:
 build:
 	cd ${ROOT_DIR}; rm -rf dist/*
 	cd ${ROOT_DIR}; python setup.py sdist bdist_wheel
+	cd ${ROOT_DIR}; pip install -e .
 
 release:
 	cd ${ROOT_DIR}; git tag -m "Release ${VERSION_TAG}" ${VERSION_TAG}
@@ -73,18 +79,18 @@ endif
 	cd ${ROOT_DIR}; git checkout main
 
 install-feast-submodule:
+	cd ${ROOT_DIR}; git submodule add --force https://github.com/feast-dev/feast.git feast
+	cd ${ROOT_DIR}/feast; git fetch --all --tags
+	cd ${ROOT_DIR}/feast; git reset --hard tags/v${FEAST_VERSION}
+
 ifeq ($(shell uname -m), arm64)
 	@echo "See https://github.com/feast-dev/feast/issues/2105 for M1 compatibility"
 	@echo "You need to export environment variables first"
 	cd ${ROOT_DIR}; pip install --upgrade pip
-	cd ${ROOT_DIR}; pip install cryptography -U
+	cd ${ROOT_DIR}/feast/sdk/python; sed -i -E 's/cryptography==[0-9].[0-9].[0-9]/cryptography/g' setup.py
 endif
 
-	cd ${ROOT_DIR}; git submodule add --force https://github.com/feast-dev/feast.git feast
-	cd ${ROOT_DIR}/feast; git fetch --all --tags
-	cd ${ROOT_DIR}/feast; git reset --hard tags/v${FEAST_VERSION}
-	cd ${ROOT_DIR}/feast; pip install "feast[ci]==${FEAST_VERSION}"
-	cd ${ROOT_DIR}/feast; pip install --no-deps -e "sdk/python[ci]"
+	cd ${ROOT_DIR}/feast; pip install -e "sdk/python[ci]"
 	-cd ${ROOT_DIR}; git rm --cached -f feast/ .gitmodules
 
 install-ci-dependencies:

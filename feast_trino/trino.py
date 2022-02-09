@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -19,6 +19,12 @@ from feast.repo_config import FeastConfigBaseModel, RepoConfig
 from feast_trino.connectors.upload import upload_pandas_dataframe_to_trino
 from feast_trino.trino_source import TrinoSource
 from feast_trino.trino_utils import Trino
+from feast_trino.constants import FEAST_MAJOR_VERSION
+
+if FEAST_MAJOR_VERSION >= 18:
+    from feast.infra.offline_stores.offline_store import RetrievalMetadata
+    from feast.saved_dataset import SavedDatasetStorage
+    from feast_trino.trino_source import SavedDatasetTrinoStorage
 
 
 class TrinoOfflineStoreConfig(FeastConfigBaseModel):
@@ -59,6 +65,7 @@ class TrinoRetrievalJob(RetrievalJob):
         config: RepoConfig,
         full_feature_names: bool,
         on_demand_feature_views: Optional[List[OnDemandFeatureView]] = None,
+        metadata: Optional[Any] = None,
     ):
         self._query = query
         self._client = client
@@ -67,6 +74,7 @@ class TrinoRetrievalJob(RetrievalJob):
         self._on_demand_feature_views = (
             None if on_demand_feature_views == [] else on_demand_feature_views
         )  # See https://github.com/feast-dev/feast/issues/2072
+        self._metadata = metadata
 
     @property
     def full_feature_names(self) -> bool:
@@ -75,6 +83,15 @@ class TrinoRetrievalJob(RetrievalJob):
     @property
     def on_demand_feature_views(self) -> Optional[List[OnDemandFeatureView]]:
         return self._on_demand_feature_views
+
+    if FEAST_MAJOR_VERSION >= 18:
+        @property
+        def metadata(self) -> Optional[RetrievalMetadata]:
+            return self._metadata
+        
+        def persist(self, storage: SavedDatasetStorage):
+            assert isinstance(storage, SavedDatasetTrinoStorage)
+            self.to_trino(destination_table=storage.trino_options.table_ref)
 
     def _to_df_internal(self) -> pd.DataFrame:
         """Return dataset as Pandas DataFrame synchronously including on demand transforms"""
@@ -92,7 +109,7 @@ class TrinoRetrievalJob(RetrievalJob):
         """Returns the SQL query that will be executed in Trino to build the historical feature table"""
         return self._query
 
-    def to_trino(self, timeout: int = 1800, retry_cadence: int = 10,) -> Optional[str]:
+    def to_trino(self, destination_table: Optional[str] = None, timeout: int = 1800, retry_cadence: int = 10,) -> Optional[str]:
         """
         Triggers the execution of a historical feature retrieval query and exports the results to a Trino table.
         Runs for a maximum amount of time specified by the timeout parameter (defaulting to 30 minutes).
@@ -103,9 +120,11 @@ class TrinoRetrievalJob(RetrievalJob):
             Returns the destination table name.
         """
         # TODO: Implement the timeout logic
-        today = date.today().strftime("%Y%m%d")
-        rand_id = str(uuid.uuid4())[:7]
-        destination_table = f"{self._client.catalog}.{self._config.offline_store.dataset}.historical_{today}_{rand_id}"
+        if destination_table is None:
+            today = date.today().strftime("%Y%m%d")
+            rand_id = str(uuid.uuid4())[:7]
+            destination_table = f"{self._client.catalog}.{self._config.offline_store.dataset}.historical_{today}_{rand_id}"
+        
         query = f"CREATE TABLE {destination_table} AS ({self._query})"
         self._client.execute_query(query_text=query)
         return destination_table
@@ -170,6 +189,35 @@ class TrinoOfflineStore(OfflineStore):
             full_feature_names=False,
             on_demand_feature_views=None,
         )
+    
+    if FEAST_MAJOR_VERSION >= 18:
+        @staticmethod
+        def pull_all_from_table_or_query(
+            config: RepoConfig,
+            data_source: DataSource,
+            join_key_columns: List[str],
+            feature_name_columns: List[str],
+            event_timestamp_column: str,
+            start_date: datetime,
+            end_date: datetime,
+        ) -> TrinoRetrievalJob:
+            assert isinstance(data_source, TrinoSource)
+            from_expression = data_source.get_table_query_string()
+
+            client = _get_trino_client(config=config)
+            field_string = ", ".join(
+                join_key_columns + feature_name_columns + [event_timestamp_column]
+            )
+            query = f"""
+                SELECT {field_string}
+                FROM {from_expression}
+                WHERE {event_timestamp_column} BETWEEN TIMESTAMP('{start_date}') AND TIMESTAMP('{end_date}')
+            """
+            
+            return TrinoRetrievalJob(
+                query=query, client=client, config=config, full_feature_names=False,
+            )
+
 
     @staticmethod
     def get_historical_features(
@@ -192,7 +240,7 @@ class TrinoOfflineStore(OfflineStore):
             catalog=config.offline_store.catalog,
             dataset_name=config.offline_store.dataset,
         )
-
+        
         entity_schema = _upload_entity_df_and_get_entity_schema(
             client=client,
             table_name=table_reference,
@@ -202,6 +250,10 @@ class TrinoOfflineStore(OfflineStore):
 
         entity_df_event_timestamp_col = offline_utils.infer_event_timestamp_from_entity_df(
             entity_schema
+        )
+
+        entity_df_event_timestamp_range = _get_entity_df_event_timestamp_range(
+            entity_df, entity_df_event_timestamp_col, client,
         )
 
         expected_join_keys = offline_utils.get_expected_join_keys(
@@ -226,6 +278,17 @@ class TrinoOfflineStore(OfflineStore):
             query_template=MULTIPLE_FEATURE_VIEW_POINT_IN_TIME_JOIN,
             full_feature_names=full_feature_names,
         )
+        
+        extra_args = {}
+        if FEAST_MAJOR_VERSION > 18:
+            extra_args.update({
+                "metadata": RetrievalMetadata(
+                    features=feature_refs,
+                    keys=list(entity_schema.keys() - {entity_df_event_timestamp_col}),
+                    min_event_timestamp=entity_df_event_timestamp_range[0],
+                    max_event_timestamp=entity_df_event_timestamp_range[1],
+                )
+            })
 
         return TrinoRetrievalJob(
             query=query,
@@ -235,6 +298,7 @@ class TrinoOfflineStore(OfflineStore):
             on_demand_feature_views=OnDemandFeatureView.get_requested_odfvs(
                 feature_refs, project, registry
             ),
+            **extra_args,
         )
 
 
@@ -287,6 +351,40 @@ def _get_trino_client(config: RepoConfig) -> Trino:
         port=config.offline_store.port,
     )
     return client
+
+
+
+def _get_entity_df_event_timestamp_range(
+    entity_df: Union[pd.DataFrame, str],
+    entity_df_event_timestamp_col: str,
+    client: Trino,
+) -> Tuple[datetime, datetime]:
+    if type(entity_df) is str:
+        job = client.query(
+            f"SELECT MIN({entity_df_event_timestamp_col}) AS min, MAX({entity_df_event_timestamp_col}) AS max "
+            f"FROM ({entity_df})"
+        )
+        res = next(job.result())
+        entity_df_event_timestamp_range = (
+            res.get("min"),
+            res.get("max"),
+        )
+    elif isinstance(entity_df, pd.DataFrame):
+        entity_df_event_timestamp = entity_df.loc[
+            :, entity_df_event_timestamp_col
+        ].infer_objects()
+        if pd.api.types.is_string_dtype(entity_df_event_timestamp):
+            entity_df_event_timestamp = pd.to_datetime(
+                entity_df_event_timestamp, utc=True
+            )
+        entity_df_event_timestamp_range = (
+            entity_df_event_timestamp.min().to_pydatetime(),
+            entity_df_event_timestamp.max().to_pydatetime(),
+        )
+    else:
+        raise InvalidEntityType(type(entity_df))
+
+    return entity_df_event_timestamp_range
 
 
 MULTIPLE_FEATURE_VIEW_POINT_IN_TIME_JOIN = """

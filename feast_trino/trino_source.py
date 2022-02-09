@@ -7,6 +7,17 @@ from feast.protos.feast.core.DataSource_pb2 import DataSource as DataSourceProto
 from feast.repo_config import RepoConfig
 from feast_trino.trino_type_map import trino_to_feast_value_type
 from feast_trino.trino_utils import Trino
+from feast_trino.constants import FEAST_MAJOR_VERSION
+
+if FEAST_MAJOR_VERSION >= 18:
+    from feast.protos.feast.core.SavedDataset_pb2 import (
+        SavedDatasetStorage as SavedDatasetStorageProto,
+    )
+    from feast.saved_dataset import SavedDatasetStorage
+    from feast.protos.feast.core.SavedDataset_pb2 import (
+        SavedDatasetStorage as SavedDatasetStorageProto,
+    )
+
 
 
 class TrinoOptions:
@@ -191,3 +202,28 @@ class TrinoSource(DataSource):
         return [
             (field_name, field_type) for field_name, field_type in table_schema.items()
         ]
+
+if FEAST_MAJOR_VERSION >= 18:
+    class SavedDatasetTrinoStorage(SavedDatasetStorage):
+        _proto_attr_name = "trino_storage"
+
+        trino_options: TrinoOptions
+
+        def __init__(self, table_ref: str):
+            self.trino_options = TrinoOptions(table_ref=table_ref, query=None)
+
+        @staticmethod
+        def from_proto(storage_proto: SavedDatasetStorageProto) -> SavedDatasetStorage:
+            return SavedDatasetTrinoStorage(
+                table_ref=TrinoOptions.from_proto(
+                    storage_proto.Trino_storage
+                ).table_ref
+            )
+
+        def to_proto(self) -> SavedDatasetStorageProto:
+            return SavedDatasetStorageProto(
+                Trino_storage=self.trino_options.to_proto()
+            )
+
+        def to_data_source(self) -> DataSource:
+            return TrinoSource(table_ref=self.trino_options.table_ref)

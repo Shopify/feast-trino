@@ -3,14 +3,17 @@ type: python
 
 
 env:
-  CFLAGS: "-I/opt/homebrew/opt/openssl@3/include" # Fix for grpc install on m1 macs. Does not work on intel macs
-  LDFLAGS: "-L/opt/homebrew/opt/openssl@3/lib" # Fix for grpc install on m1 macs. Does not work on intel macs
+  CFLAGS: "-I$(brew --prefix xz)/include" # Fix for m1 macs. Does not work on intel
+  LDFLAGS: "-L$(brew --prefix xz)/lib" # Fix for m1 macs. Does not work on intel
   GRPC_PYTHON_BUILD_SYSTEM_OPENSSL: "1"  # Fix grpc install on m1 macs
   GRPC_PYTHON_BUILD_SYSTEM_ZLIB: "1"  # Fix grpc install on m1 macs
 
 up:
   - homebrew:
-    - openssl@3
+    - xz
+    - protobuf
+    - openssl
+    - zlib
   - python: 3.9.8
   - custom:
       name: Install the dependencies locally
@@ -19,7 +22,5 @@ up:
   - custom:
      name: Reinstall protobuf with M1 compatibility
      met?: |
-      export CFLAGS="-I$(brew --prefix protobuf)/include"
-      export LDFLAGS="-L$(brew --prefix protobuf)/lib"
       pip install protobuf==3.17 --force-reinstall --no-deps --install-option="--cpp_implementation"
      meet: "true"

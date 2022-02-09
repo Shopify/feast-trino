@@ -1,4 +1,5 @@
 from typing import Dict, List
+import uuid
 
 import pandas as pd
 
@@ -8,12 +9,17 @@ from feast_trino.connectors.upload import upload_pandas_dataframe_to_trino
 from feast_trino.trino import TrinoOfflineStoreConfig
 from feast_trino.trino_source import TrinoSource
 from feast_trino.trino_utils import Trino
+from feast_trino.constants import FEAST_MAJOR_VERSION
 from tests.integration.feature_repos.integration_test_repo_config import (
     IntegrationTestRepoConfig,
 )
 from tests.integration.feature_repos.universal.data_source_creator import (
     DataSourceCreator,
 )
+
+if FEAST_MAJOR_VERSION >= 18:
+    from feast.saved_dataset import SavedDatasetStorage
+    from feast_trino.trino_source import SavedDatasetTrinoStorage
 
 
 class TrinoSourceCreator(DataSourceCreator):
@@ -63,6 +69,13 @@ class TrinoSourceCreator(DataSourceCreator):
             dataset=self.project_name,
             connector={"type": "memory"},
         )
+
+    if FEAST_MAJOR_VERSION >= 18:
+        def create_saved_dataset_destination(self) -> SavedDatasetStorage:
+            table = self.get_prefixed_table_name(
+                f"persisted_{str(uuid.uuid4()).replace('-', '_')}"
+            )
+            return SavedDatasetTrinoStorage(table_ref=table)
 
     def teardown(self):
         for table in self.tables_created:
