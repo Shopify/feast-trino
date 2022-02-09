@@ -87,6 +87,9 @@ ifeq ($(shell uname -m), arm64)
 	@echo "See https://github.com/feast-dev/feast/issues/2105 for M1 compatibility"
 	@echo "You need to export environment variables first"
 	cd ${ROOT_DIR}; pip install --upgrade pip
+
+	# `cryptography==3.*` is not supported on mac M1. Feast is too strict about it
+	# so we just remove the condition here
 	cd ${ROOT_DIR}/feast/sdk/python; sed -i -E 's/cryptography==[0-9].[0-9].[0-9]/cryptography/g' setup.py
 endif
 
