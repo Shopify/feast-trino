@@ -30,13 +30,13 @@ class QueryStatus(Enum):
 
 class Trino:
     def __init__(
-            self,
-            host: Optional[str] = None,
-            port: Optional[int] = None,
-            user: Optional[str] = None,
-            catalog: Optional[str] = None,
-            auth: Optional[Any] = None,
-            http_scheme: Optional[str] = None,
+        self,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        user: Optional[str] = None,
+        catalog: Optional[str] = None,
+        auth: Optional[Any] = None,
+        http_scheme: Optional[str] = None,
     ):
         self.host = host or os.getenv("TRINO_HOST")
         self.port = port or os.getenv("TRINO_PORT")
