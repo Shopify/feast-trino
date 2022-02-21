@@ -30,22 +30,31 @@ class QueryStatus(Enum):
 
 class Trino:
     def __init__(
-        self,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        user: Optional[str] = None,
-        catalog: Optional[str] = None,
+            self,
+            host: Optional[str] = None,
+            port: Optional[int] = None,
+            user: Optional[str] = None,
+            catalog: Optional[str] = None,
+            auth: Optional[Any] = None,
+            http_scheme: Optional[str] = None,
     ):
         self.host = host or os.getenv("TRINO_HOST")
         self.port = port or os.getenv("TRINO_PORT")
         self.user = user or os.getenv("TRINO_USER")
         self.catalog = catalog or os.getenv("TRINO_CATALOG")
+        self.auth = auth or os.getenv("TRINO_AUTH")
+        self.http_scheme = http_scheme or os.getenv("TRINO_HTTP_SCHEME")
         self._cursor = None
 
     def _get_cursor(self) -> Cursor:
         if self._cursor is None:
             self._cursor = trino.dbapi.connect(
-                host=self.host, port=self.port, user=self.user, catalog=self.catalog
+                host=self.host,
+                port=self.port,
+                user=self.user,
+                catalog=self.catalog,
+                auth=self.auth,
+                http_scheme=self.http_scheme
             ).cursor()
 
         return self._cursor
