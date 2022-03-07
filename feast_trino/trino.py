@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Tuple
 
 import numpy as np
 import pandas as pd
@@ -212,9 +212,13 @@ class TrinoOfflineStore(OfflineStore):
             entity_schema, expected_join_keys, entity_df_event_timestamp_col
         )
 
+        entity_df_event_timestamp_range = _get_entity_df_event_timestamp_range(
+            entity_df, entity_df_event_timestamp_col, client,
+        )
+
         # Build a query context containing all information required to template the Trino SQL query
         query_context = offline_utils.get_feature_view_query_context(
-            feature_refs, feature_views, registry, project,
+            feature_refs, feature_views, registry, project, entity_df_event_timestamp_range
         )
 
         # Generate the Trino SQL query from the query context
@@ -287,6 +291,35 @@ def _get_trino_client(config: RepoConfig) -> Trino:
         port=config.offline_store.port,
     )
     return client
+
+
+def _get_entity_df_event_timestamp_range(
+    entity_df: Union[pd.DataFrame, str],
+    entity_df_event_timestamp_col: str,
+    client: Trino,
+) -> Tuple[datetime, datetime]:
+    if type(entity_df) is str:
+        results = client.execute_query(
+            f"SELECT MIN({entity_df_event_timestamp_col}) AS min, MAX({entity_df_event_timestamp_col}) AS max "
+            f"FROM ({entity_df})"
+        )
+        entity_df_event_timestamp_range = tuple(results.data[0])
+    elif isinstance(entity_df, pd.DataFrame):
+        entity_df_event_timestamp = entity_df.loc[
+            :, entity_df_event_timestamp_col
+        ].infer_objects()
+        if pd.api.types.is_string_dtype(entity_df_event_timestamp):
+            entity_df_event_timestamp = pd.to_datetime(
+                entity_df_event_timestamp, utc=True
+            )
+        entity_df_event_timestamp_range = (
+            entity_df_event_timestamp.min().to_pydatetime(),
+            entity_df_event_timestamp.max().to_pydatetime(),
+        )
+    else:
+        raise InvalidEntityType(type(entity_df))
+
+    return entity_df_event_timestamp_range
 
 
 MULTIPLE_FEATURE_VIEW_POINT_IN_TIME_JOIN = """
