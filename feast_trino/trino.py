@@ -379,9 +379,9 @@ WITH entity_dataframe AS (
             {{ feature }} as {% if full_feature_names %}{{ featureview.name }}__{{feature}}{% else %}{{ feature }}{% endif %}{% if loop.last %}{% else %}, {% endif %}
         {% endfor %}
     FROM {{ featureview.table_subquery }}
-    WHERE {{ featureview.event_timestamp_column }} <= (SELECT MAX(entity_timestamp) FROM entity_dataframe)
+    WHERE {{ featureview.event_timestamp_column }} <= '{{ featureview.max_event_timestamp }}'
     {% if featureview.ttl == 0 %}{% else %}
-    AND {{ featureview.event_timestamp_column }} >= (SELECT MIN(entity_timestamp) FROM entity_dataframe) - interval '{{ featureview.ttl }}' second
+    AND {{ featureview.event_timestamp_column }} >= '{{ featureview.min_event_timestamp }}'
     {% endif %}
 ),
 {{ featureview.name }}__base AS (
