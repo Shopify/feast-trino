@@ -9,7 +9,7 @@ with open("VERSION", "r") as f:
     VERSION = f.read()
 
 INSTALL_REQUIRE = [
-    "feast>=0.17.0,<0.18.0",
+    "feast==0.17.*",
     "trino>=0.305.0,<0.400.0",
 ]
 
