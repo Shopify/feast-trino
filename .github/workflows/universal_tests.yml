@@ -27,10 +27,7 @@ jobs:
       - name: pip cache
         uses: actions/cache@v2
         with:
-          path: |
-            ${{ steps.pip-cache.outputs.dir }}
-            /opt/hostedtoolcache/Python
-            /Users/runner/hostedtoolcache/Python
+          path: ${{ steps.pip-cache.outputs.dir }}
           key: ${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-pip-${{ hashFiles('**/setup.py') }}
           restore-keys: |
             ${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-pip-
