@@ -3,13 +3,14 @@
 Trino is not included in current [Feast](https://github.com/feast-dev/feast) roadmap, this project intends to add Trino support for Offline Store.  
 
 ## Version compatibilities
-The feast-trino plugin is tested on the following versions of python [3.7, 3.8, 3.9]
+The feast-trino plugin is tested on the following versions of python \[3.7, 3.8, 3.9, 3.10\]
 
 Here is also how the current feast-trino plugin has been tested against different versions of Feast and Trino
 
 | Feast-trino | Feast                   | Trino |
 |-------------|-------------------------|-------|
 | 1.0.*       | From 0.15.\* to 0.16.\* | 364   |
+| 1.1.*       | From 0.17.\*            | 364   |
 
 ## Quickstart
 
@@ -61,7 +62,7 @@ online_store:
 # This is an example feature definition file
 import pandas as pd
 from google.protobuf.duration_pb2 import Duration
-from feast import Entity, Feature, FeatureView, FileSource, ValueType, FeatureStore
+from feast import Entity, Feature, FeatureView, ValueType, FeatureStore
 
 from feast_trino.connectors.upload import upload_pandas_dataframe_to_trino
 from feast_trino import TrinoSource
