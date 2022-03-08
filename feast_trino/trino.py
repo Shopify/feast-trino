@@ -218,7 +218,11 @@ class TrinoOfflineStore(OfflineStore):
 
         # Build a query context containing all information required to template the Trino SQL query
         query_context = offline_utils.get_feature_view_query_context(
-            feature_refs, feature_views, registry, project, entity_df_event_timestamp_range
+            feature_refs,
+            feature_views,
+            registry,
+            project,
+            entity_df_event_timestamp_range,
         )
 
         # Generate the Trino SQL query from the query context
@@ -303,7 +307,10 @@ def _get_entity_df_event_timestamp_range(
             f"SELECT MIN({entity_df_event_timestamp_col}) AS min, MAX({entity_df_event_timestamp_col}) AS max "
             f"FROM ({entity_df})"
         )
-        entity_df_event_timestamp_range = tuple(results.data[0])
+        entity_df_event_timestamp_range = (
+            datetime.fromisoformat(results.data[0][0]),
+            datetime.fromisoformat(results.data[0][1]),
+        )
     elif isinstance(entity_df, pd.DataFrame):
         entity_df_event_timestamp = entity_df.loc[
             :, entity_df_event_timestamp_col
