@@ -4,6 +4,7 @@ import datetime
 import os
 import signal
 from dataclasses import dataclass
+from dateutil import parser
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -125,10 +126,40 @@ class Results:
                 for column in self.columns
             ]
         )
+    
+    def to_dict(self) -> Dict[str, List]:
+        results = {}
+        for col_index, col_name in enumerate(self.columns_names):
+            is_timestamp = False
+            if self.schema[col_name].startswith("timestamp"):
+                is_timestamp = True
+            
+            for values in self.data:
+                new_value = values[col_index]
+                if is_timestamp:
+                    new_value = int(parser.parse(new_value).timestamp())
+                
+                results.update({
+                    col_name: results.get(col_name, []) + [new_value]
+                })
+        return results
+        
+    def to_pyarrow(self) -> pa.Table:
+        return pa.Table.from_pydict(
+            self.to_dict(),
+            schema=pa.schema(
+                [
+                    pa.field(col_name, trino_to_pa_value_type(self.schema[col_name]))
+                    for col_name in self.columns_names
+                ]
+            ),
+        )
+
 
     def to_dataframe(self) -> pd.DataFrame:
         df = pd.DataFrame(data=self.data, columns=self.columns_names)
         for col_name, col_type in self.schema.items():
             if col_type.startswith("timestamp"):
-                df[col_name] = pd.to_datetime(df[col_name])
+                df[col_name] = pd.to_datetime(df[col_name]).apply(lambda x: int(x.timestamp()))
+
         return df.fillna(np.nan)

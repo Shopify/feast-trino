@@ -33,7 +33,7 @@ ifneq ($(strip ${IS_PACKAGE_INSTALLED}), 1)
 	cd ${ROOT_DIR}; make build
 endif
 	-mv ${ROOT_DIR}/tests ${ROOT_DIR}/tests_old
-	-cd ${ROOT_DIR}; FULL_REPO_CONFIGS_MODULE=feast_trino.feast_tests FEAST_USAGE=False IS_TEST=True python -m pytest --integration --universal ${ROOT_DIR}/feast/sdk/python/tests/integration/registration/test_universal_types.py
+	-cd ${ROOT_DIR}; FULL_REPO_CONFIGS_MODULE=feast_trino.feast_tests FEAST_USAGE=False IS_TEST=True python -m pytest --integration --universal ${ROOT_DIR}/feast/sdk/python/tests/integration/e2e/test_universal_e2e.py
 	-mv ${ROOT_DIR}/tests_old ${ROOT_DIR}/tests
 
 test-python-universal-ci:

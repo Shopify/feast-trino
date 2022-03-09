@@ -96,14 +96,12 @@ class TrinoRetrievalJob(RetrievalJob):
     def _to_df_internal(self) -> pd.DataFrame:
         """Return dataset as Pandas DataFrame synchronously including on demand transforms"""
         results = self._client.execute_query(query_text=self._query)
-        self.pyarrow_schema = results.pyarrow_schema
         return results.to_dataframe()
 
     def _to_arrow_internal(self) -> pyarrow.Table:
         """Return payrrow dataset as synchronously including on demand transforms"""
-        return pyarrow.Table.from_pandas(
-            self._to_df_internal(), schema=self.pyarrow_schema
-        )
+        results = self._client.execute_query(query_text=self._query)
+        return results.to_pyarrow()
 
     def to_sql(self) -> str:
         """Returns the SQL query that will be executed in Trino to build the historical feature table"""
@@ -253,7 +251,9 @@ class TrinoOfflineStore(OfflineStore):
         )
 
         entity_df_event_timestamp_range = _get_entity_df_event_timestamp_range(
-            entity_df, entity_df_event_timestamp_col, client,
+            entity_df=entity_df,
+            entity_df_event_timestamp_col=entity_df_event_timestamp_col,
+            client=client,
         )
 
         expected_join_keys = offline_utils.get_expected_join_keys(
@@ -266,7 +266,11 @@ class TrinoOfflineStore(OfflineStore):
 
         # Build a query context containing all information required to template the Trino SQL query
         query_context = offline_utils.get_feature_view_query_context(
-            feature_refs, feature_views, registry, project,
+            feature_refs=feature_refs,
+            feature_views=feature_views,
+            registry=registry,
+            project=project,
+            entity_df_timestamp_range=entity_df_event_timestamp_range,
         )
 
         # Generate the Trino SQL query from the query context
@@ -360,14 +364,15 @@ def _get_entity_df_event_timestamp_range(
     client: Trino,
 ) -> Tuple[datetime, datetime]:
     if type(entity_df) is str:
-        job = client.query(
+        job = client.execute_query(
             f"SELECT MIN({entity_df_event_timestamp_col}) AS min, MAX({entity_df_event_timestamp_col}) AS max "
             f"FROM ({entity_df})"
         )
-        res = next(job.result())
+
+        result_df = job.to_dataframe()
         entity_df_event_timestamp_range = (
-            res.get("min"),
-            res.get("max"),
+            result_df.iloc[0]["min"],
+            result_df.iloc[0]["max"],
         )
     elif isinstance(entity_df, pd.DataFrame):
         entity_df_event_timestamp = entity_df.loc[
