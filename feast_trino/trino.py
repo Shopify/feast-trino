@@ -308,8 +308,8 @@ def _get_entity_df_event_timestamp_range(
             f"FROM ({entity_df})"
         )
         entity_df_event_timestamp_range = (
-            datetime.fromisoformat(results.data[0][0]),
-            datetime.fromisoformat(results.data[0][1]),
+            pd.to_datetime(results.data[0][0]).to_pydatetime(),
+            pd.to_datetime(results.data[0][1]).to_pydatetime(),
         )
     elif isinstance(entity_df, pd.DataFrame):
         entity_df_event_timestamp = entity_df.loc[
@@ -386,9 +386,9 @@ WITH entity_dataframe AS (
             {{ feature }} as {% if full_feature_names %}{{ featureview.name }}__{{feature}}{% else %}{{ feature }}{% endif %}{% if loop.last %}{% else %}, {% endif %}
         {% endfor %}
     FROM {{ featureview.table_subquery }}
-    WHERE {{ featureview.event_timestamp_column }} <= '{{ featureview.max_event_timestamp }}'
+    WHERE {{ featureview.event_timestamp_column }} <= from_iso8601_timestamp('{{ featureview.max_event_timestamp }}')
     {% if featureview.ttl == 0 %}{% else %}
-    AND {{ featureview.event_timestamp_column }} >= '{{ featureview.min_event_timestamp }}'
+    AND {{ featureview.event_timestamp_column }} >= from_iso8601_timestamp('{{ featureview.min_event_timestamp }}')
     {% endif %}
 ),
 {{ featureview.name }}__base AS (
