@@ -248,6 +248,18 @@ class TrinoOfflineStore(OfflineStore):
             ),
         )
 
+    @staticmethod
+    def pull_all_from_table_or_query(
+        config: RepoConfig,
+        data_source: DataSource,
+        join_key_columns: List[str],
+        feature_name_columns: List[str],
+        event_timestamp_column: str,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> RetrievalJob:
+        raise NotImplementedError()
+
 
 def _get_table_reference_for_new_entity(catalog: str, dataset_name: str) -> str:
     """Gets the table_id for the new entity to be uploaded."""
