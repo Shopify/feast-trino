@@ -80,6 +80,7 @@ class TrinoOptions:
 class TrinoSource(DataSource):
     def __init__(
         self,
+        name: str,
         event_timestamp_column: Optional[str] = "",
         table_ref: Optional[str] = None,
         created_timestamp_column: Optional[str] = "",
@@ -88,6 +89,7 @@ class TrinoSource(DataSource):
         query: Optional[str] = None,
     ):
         super().__init__(
+            name,
             event_timestamp_column,
             created_timestamp_column,
             field_mapping,
@@ -139,6 +141,7 @@ class TrinoSource(DataSource):
 
         trino_options = TrinoOptions.from_proto(data_source.custom_options)
         return TrinoSource(
+            name=data_source.name, # TODO: Validate
             field_mapping=dict(data_source.field_mapping),
             table_ref=trino_options.table_ref,
             event_timestamp_column=data_source.event_timestamp_column,
@@ -154,6 +157,7 @@ class TrinoSource(DataSource):
             custom_options=self.trino_options.to_proto(),
         )
 
+        data_source_proto.name = self.name # TODO: Validate
         data_source_proto.event_timestamp_column = self.event_timestamp_column
         data_source_proto.created_timestamp_column = self.created_timestamp_column
         data_source_proto.date_partition_column = self.date_partition_column
