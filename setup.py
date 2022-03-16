@@ -9,7 +9,7 @@ with open("VERSION", "r") as f:
     VERSION = f.read()
 
 INSTALL_REQUIRE = [
-    "feast>=0.15.0,<1.0.0",
+    "feast>=0.19.0,<1.0.0",
     "trino>=0.305.0,<0.400.0",
     "regex==2022.3.2",
 ]
