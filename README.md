@@ -58,10 +58,12 @@ online_store:
 #### Edit `feature_repo/example.py`
 
 ```python
-# This is an example feature definition file
+# This is an example feature definition file using Trino source
+from datetime import timedelta
+
 import pandas as pd
 from google.protobuf.duration_pb2 import Duration
-from feast import Entity, Feature, FeatureView, FileSource, ValueType, FeatureStore
+from feast import Entity, Feature, FeatureView, ValueType, FeatureStore
 
 from feast_trino.connectors.upload import upload_pandas_dataframe_to_trino
 from feast_trino import TrinoSource
@@ -86,11 +88,11 @@ upload_pandas_dataframe_to_trino(
     connector_args={"type": "memory"},
 )
 
-
 # Read data from parquet files. Parquet is convenient for local development mode. For
 # production, you can use your favorite DWH, such as BigQuery. See Feast documentation
 # for more info.
 driver_hourly_stats = TrinoSource(
+    name="driver_hourly_stats_src",
     event_timestamp_column="event_timestamp",
     table_ref="feast.driver_stats",
     created_timestamp_column="created",
@@ -119,11 +121,12 @@ driver_hourly_stats_view = FeatureView(
 store.apply([driver, driver_hourly_stats_view])
 
 # Run an historical retrieval query
+query_date = str(input_df["event_timestamp"].max() - timedelta(days=1))
 output_df = store.get_historical_features(
-    entity_df="""
+    entity_df=f"""
     SELECT
         1004 AS driver_id,
-        TIMESTAMP '2021-11-21 15:00:00+00:00' AS event_timestamp
+        TIMESTAMP '{query_date}' AS event_timestamp
     """,
     features=["driver_hourly_stats:conv_rate"]
 ).to_df()
