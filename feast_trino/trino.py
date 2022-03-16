@@ -13,10 +13,11 @@ from feast.data_source import DataSource
 from feast.errors import InvalidEntityType
 from feast.feature_view import DUMMY_ENTITY_ID, DUMMY_ENTITY_VAL, FeatureView
 from feast.infra.offline_stores import offline_utils
-from feast.infra.offline_stores.offline_store import OfflineStore, RetrievalJob
+from feast.infra.offline_stores.offline_store import OfflineStore, RetrievalJob, RetrievalMetadata
 from feast.on_demand_feature_view import OnDemandFeatureView
 from feast.registry import Registry
 from feast.repo_config import FeastConfigBaseModel, RepoConfig
+from feast.saved_dataset import SavedDatasetStorage
 from feast_trino.connectors.upload import upload_pandas_dataframe_to_trino
 from feast_trino.trino_source import TrinoSource
 from feast_trino.trino_utils import Trino
@@ -110,6 +111,22 @@ class TrinoRetrievalJob(RetrievalJob):
         query = f"CREATE TABLE {destination_table} AS ({self._query})"
         self._client.execute_query(query_text=query)
         return destination_table
+
+    def persist(self, storage: SavedDatasetStorage):
+        """
+        Run the retrieval and persist the results in the same offline store used for read.
+        """
+        # TODO: Implement
+        raise NotImplementedError()
+
+    @property
+    def metadata(self) -> Optional[RetrievalMetadata]:
+        """
+        Return metadata information about retrieval.
+        Should be available even before materializing the dataset itself.
+        """
+        # TODO: Implement?
+        return None
 
 
 class TrinoOfflineStore(OfflineStore):
@@ -223,9 +240,12 @@ class TrinoOfflineStore(OfflineStore):
             entity_schema, expected_join_keys, entity_df_event_timestamp_col
         )
 
+        # TODO: Implement timestamp range (PR #49 opened in Shopify/feast-trino)
+        tmp_timestamp_range = (datetime(1900, 1, 1), datetime.now())
+
         # Build a query context containing all information required to template the Trino SQL query
         query_context = offline_utils.get_feature_view_query_context(
-            feature_refs, feature_views, registry, project,
+            feature_refs, feature_views, registry, project, tmp_timestamp_range
         )
 
         # Generate the Trino SQL query from the query context
@@ -258,6 +278,7 @@ class TrinoOfflineStore(OfflineStore):
         start_date: datetime,
         end_date: datetime,
     ) -> RetrievalJob:
+        # TODO: Implement this method
         raise NotImplementedError()
 
 
